@@ -1,0 +1,7 @@
+secrets/*
+!secrets/README.md
+repo/
+.claude/settings.local.json
+.claude/skills
+node_modules/
+__pycache__/

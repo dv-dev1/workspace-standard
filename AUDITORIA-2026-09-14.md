@@ -41,18 +41,19 @@ Nenhum valor foi lido para este relatório: o `check` e o `git grep -l` devolvem
   com o GitLab atrás de VPN. O `data-colector` tem ainda formato de token em
   `RetornaDadosCampanhaNPS.py:22`.
 
-Formato de token não prova credencial viva: o JWT de login do Botpress expira. Chave de API, token de
-bot do Telegram e Bearer de API de cliente precisam ser conferidos e, se vivos, rotacionados. Tirar do
-histórico exige reescrever o git (`git filter-repo`) e forçar o push — decisão sua e do time.
+Formato de token não prova credencial viva: o JWT de login do Botpress expira. No botpress, a exposição
+já era conhecida: em 2026-07-02 ficou decidido não priorizar rotação nem reescrita de histórico, porque o
+workspace é local e os remotos não têm outros colaboradores. Esta auditoria só acrescenta que o GitHub
+está limpo. Nos repositórios de outras pessoas (`data-colector-web-api`, `rhp-agents-api`), o `.env`
+versionado é decisão do time.
 
 ## O que corrigir primeiro
 
 Migrar os workspaces está fora do escopo deste repositório; esta é a ordem que o custo e o ganho sugerem.
 
-1. A seção Segurança.
-2. app-builder-smartspace: tirar o hook de Stop órfão de `.claude/settings.local.json`.
-3. citrus, app-builder e botpress: podar o `current-state.md`. Acima de 120 KB, são 30 a 40 mil tokens
+1. app-builder-smartspace: tirar o hook de Stop órfão de `.claude/settings.local.json`.
+2. citrus, app-builder e botpress: podar o `current-state.md`. Acima de 120 KB, são 30 a 40 mil tokens
    lidos antes da primeira ação de cada sessão.
-4. Workspaces ativos: `git init`, o `.gitignore` do template e `CLAUDE.md` com `@AGENTS.md`.
-5. Arquivar Estudos-de-Core, projeto-yuann, ResumeAI e api-agents.
-6. Tirar os clones soltos (`rhp-agents-api`, `data-colector-web-api`) da raiz do vault.
+3. Workspaces ativos: `git init`, o `.gitignore` do template e `CLAUDE.md` com `@AGENTS.md`.
+4. Arquivar Estudos-de-Core, projeto-yuann, ResumeAI e api-agents.
+5. Tirar os clones soltos (`rhp-agents-api`, `data-colector-web-api`) da raiz do vault.

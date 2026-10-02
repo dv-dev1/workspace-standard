@@ -33,6 +33,11 @@ def ler(caminho):
     return Path(caminho).read_text(encoding="utf-8", errors="replace")
 
 
+def eh_junction(caminho):
+    # Path.is_junction só existe no Python 3.12+; o python3 do macOS é 3.9. Junction só existe no Windows.
+    return getattr(caminho, "is_junction", lambda: False)()
+
+
 def kb(n):
     return f"{n / 1024:.1f} KB"
 
@@ -48,7 +53,7 @@ def cobre(padrao, alvo):
 def arquivos_de_texto(ws):
     for raiz, pastas, arquivos in os.walk(ws):
         pastas[:] = [p for p in pastas
-                     if p not in PASTAS_FORA_DA_VARREDURA and not Path(raiz, p).is_junction()]
+                     if p not in PASTAS_FORA_DA_VARREDURA and not eh_junction(Path(raiz, p))]
         for nome in arquivos:
             caminho = Path(raiz, nome)
             if caminho.suffix.lower() not in EXTENSOES_TEXTO:
@@ -181,7 +186,7 @@ def link(ws):
     if not atalho.is_dir():
         if atalho.is_symlink():
             atalho.unlink()
-        elif atalho.is_junction():
+        elif eh_junction(atalho):
             atalho.rmdir()
         if os.name == "nt":
             # Junction de diretório não exige administrador; symlink exige.

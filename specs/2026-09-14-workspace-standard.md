@@ -38,7 +38,7 @@ do template; decisões viram um ADR por arquivo em `decisions/`.
 3. Auditoria reproduzível dos workspaces atuais:
 
    ```
-   python workspace.py check "C:/Users/daniel.gomes/Documents/Codex-Memory/projects/.agent/projects/*"
+   python workspace.py check "<workspaces>/*"
    ```
 
    Esperado: `app-builder-smartspace` acusa o hook órfão de `autonomous-work`;

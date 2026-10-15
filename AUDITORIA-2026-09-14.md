@@ -3,7 +3,7 @@
 Medido com:
 
 ```
-python3 workspace.py check "C:/Users/daniel.gomes/Documents/Codex-Memory/projects/.agent/projects/*"
+python3 workspace.py check "<workspaces>/*"
 ```
 
 Exit code 1, 152 linhas de saída. Os workspaces são anteriores ao padrão: erro aqui mede a distância
@@ -31,7 +31,7 @@ até o `STANDARD.md`, não defeito do projeto — exceto na seção Segurança.
 
 Nenhum valor foi lido para este relatório: o `check` e o `git grep -l` devolvem só caminho e linha.
 
-- **GitLab `gitlab.digivox.com.br/daniel.gomes/workspace-botpress-documentation`, branch `main`:**
+- **GitLab `<gitlab-interno>/<usuário>/workspace-botpress-documentation`, branch `main`:**
   18 arquivos com formato de token, entre eles `scripts/botpress-deploy/.token` e
   `scripts/botpress-deploy/data/detran-ro/secrets/telegram.local.json` — um arquivo de segredo
   inteiro commitado. Os commits `39ad3b3`, `92c460e` e `6f8706e` estão em `gitlab/main`.

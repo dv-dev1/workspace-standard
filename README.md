@@ -12,7 +12,7 @@ python3 workspace.py new <vault>/projects/.agent/projects/<nome>
 Saída real, num workspace de teste:
 
 ```
-ws-teste: criado em C:/Users/daniel.gomes/AppData/Local/Temp/claude/C--Users-daniel-gomes/c4b9d125-f7e9-4363-8d89-ec2a5e8a2f0b/scratchpad/ws-teste. Preencha o AGENTS.md e rode check.
+ws-teste: criado em <tmp>/ws-teste. Preencha o AGENTS.md e rode check.
 ```
 
 O que nasce:
@@ -51,7 +51,7 @@ app-builder-smartspace: 5 erro(s), 3 aviso(s)
   ERRO  CLAUDE.md não importa @AGENTS.md
   ERRO  AGENTS.md + current-state.md com 1772 linhas e 144.0 KB; teto 200 linhas ou 25.0 KB
   ERRO  .gitignore não cobre .claude/settings.local.json
-  ERRO  .claude/settings.local.json: hook chama /c/Users/daniel.gomes/.claude/skills/autonomous-work/hooks/autonomous-stop-hook.sh, que não existe
+  ERRO  .claude/settings.local.json: hook chama ~/.claude/skills/autonomous-work/hooks/autonomous-stop-hook.sh, que não existe
   AVISO sem .git: a memória não tem histórico
   AVISO skills visíveis para um agente só: o Claude não vê; rode workspace.py link
   AVISO session-log.md com 128.1 KB: mova as linhas antigas para session-log-AAAA.md
@@ -82,3 +82,7 @@ python3 -m unittest test_workspace -v
 - `STANDARD.md` — o contrato: papel e teto de cada peça
 - `AUDITORIA-2026-09-14.md` — os workspaces atuais medidos pelo check
 - `specs/2026-09-14-workspace-standard.md` — a spec deste repositório
+
+## README dos repositórios
+
+`TEMPLATE-README.md` é o esqueleto de README (cabeçalho, Mermaid, tabelas, limites); regras na skill `readme-padrao` do `claude-setup`.

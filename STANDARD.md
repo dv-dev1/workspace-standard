@@ -12,12 +12,13 @@ o que aprendeu para a próxima sessão.
 ├── CLAUDE.md             @AGENTS.md e @current-state.md, nada mais
 ├── current-state.md      fotografia do que vale agora
 ├── session-log.md        uma linha por sessão, com link para a spec
+├── ARCHITECTURE.md       forças e forma; lido sob demanda pela skill arquitetura
 ├── decisions/            um ADR por arquivo: AAAA-MM-DD-slug.md
 ├── specs/                trabalho em andamento; specs/arquivo/ guarda as fechadas
 ├── memory/               auto-memória do Claude, via autoMemoryDirectory
 ├── .agents/skills/       skills no padrão Agent Skills
 ├── secrets/              credenciais locais; só o README é versionado
-├── repo/                 clone do código, quando o workspace tem um (ignorado)
+├── repo/                 o código: pasta de verdade, com git próprio (ignorada pelo git do workspace)
 └── .claude/              settings.json versionado; settings.local.json e skills são locais
 ```
 
@@ -33,6 +34,8 @@ o que aprendeu para a próxima sessão.
 - Visão geral de diretórios e de arquitetura não entra: o agente deriva do código, e a medição
   mostrou que ela não ajuda. Para código que o agente não alcança com grep (servidor remoto,
   instância n8n, bot publicado), a seção Fontes diz de onde exportar ou consultar.
+- Forças e forma da arquitetura moram no `ARCHITECTURE.md`, fora da entrada: a skill arquitetura
+  lê sob demanda, na decisão cara de desfazer.
 
 ### Estado e histórico
 
@@ -45,7 +48,8 @@ o que aprendeu para a próxima sessão.
 
 ### Decisões
 
-- Uma por arquivo em `decisions/AAAA-MM-DD-slug.md`, com Contexto, Decisão, Consequências e Status.
+- Uma por arquivo em `decisions/AAAA-MM-DD-slug.md`, slug em inglês, com Contexto, Decisão,
+  Alternativas, Consequências, Revisitar quando (gatilho medível) e Status.
 - Decisão antiga não se edita. A nova revoga, e a antiga ganha `Status: revogada por <arquivo>`.
 
 ### Specs
@@ -76,8 +80,35 @@ o que aprendeu para a próxima sessão.
 
 ### Código
 
-- Nunca clonar repositório solto no vault. Clone do próprio workspace mora em `repo/`, ignorado;
-  clone compartilhado fica fora, e a seção Fontes aponta o caminho.
+- O código mora em `repo/`, pasta de verdade com git próprio, ignorada pelo git do workspace. Não é
+  atalho: o agente abre a sessão na raiz do workspace e constrói dentro de `repo/`; o git do código
+  roda com `git -C repo`. `workspace.py new --repo <url>` clona; sem URL, `repo/` nasce com `git init`.
+- Projeto novo declara `Organização: por funcionalidade` na seção Código do `AGENTS.md` e segue:
+  - uma pasta por funcionalidade, com o nome do negócio: `reminders/`, `payments/`;
+  - dentro dela, `model` (dado e regra), `routes` ou `handler` (entrada: recebe, chama o model,
+    devolve) e `view` só quando há tela ou template;
+  - o que é de todos (banco, config, tempo) numa só `shared/`;
+  - nada de `utils`, `helpers`, `misc`, `common`, `lib`, `core`, `server`, `domain`, `comum`,
+    `servidor`, `dominio`: pasta genérica não diz o que tem dentro.
+
+| Stack | Funcionalidade | Entrada |
+|---|---|---|
+| Python | `app/<feature>/model.py`, `routes.py` | `app/main.py` só monta as rotas |
+| Node, worker | `src/<feature>/model.ts`, `routes.ts` | `src/index.ts` só monta |
+| Next.js | `features/<feature>/model.ts`, `view.tsx` | `app/` só chama `features/` |
+| Go | `internal/<feature>/model.go`, `handler.go` | `cmd/<name>/main.go` só monta |
+
+- Código existente não é reorganizado de uma vez: sem a marca no `AGENTS.md`, o check não cobra a
+  organização. Escolhida em 05/11/2026 contra MVC por camada (feature espalhada em 3 pastas) e
+  Clean/Hexagonal (nomes abstratos); revisitar quando um projeto passar de ~30 funcionalidades.
+
+### Idioma
+
+- Pastas, arquivos, identificadores e comentários de código em inglês. Texto que o usuário final lê
+  pode ficar em pt-BR.
+- Documentos do workspace (`AGENTS.md`, estado, decisões, specs, commits) ficam em pt-BR, com nome
+  de arquivo em inglês.
+- Arquivo que já existe em português mantém o idioma quando editado, para não misturar.
 
 ### Memória do Claude
 
@@ -94,7 +125,7 @@ o que aprendeu para a próxima sessão.
 ## Comandos
 
 ```
-python3 workspace.py new <destino>          copia template/, git init, link
+python3 workspace.py new <destino> [--repo <url>]   copia template/, git init, repo/, link
 python3 workspace.py link <workspace>       refaz autoMemoryDirectory, junction de skills e hook
 python3 workspace.py check <workspace>...   mede; aceita glob; exit 1 quando há erro
 ```
@@ -110,6 +141,9 @@ padrão, e quando não está, o agente começa a sessão sabendo o que corrigir.
 | `CLAUDE.md` importa `@AGENTS.md` | erro |
 | `AGENTS.md` + `current-state.md` ≤ 200 linhas e ≤ 25 KB | erro |
 | `.gitignore` cobre `secrets/`, `.claude/settings.local.json` e, se existir, `repo/` | erro |
+| `repo/` não é atalho e tem `.git` próprio | erro |
+| com `Organização: por funcionalidade`: nenhuma pasta genérica nem nome com acento em `repo/`, e toda funcionalidade tem `model` | erro |
+| o workspace tem `repo/` | aviso |
 | nenhum token com formato conhecido fora de `secrets/` (a saída mostra só arquivo e linha) | erro |
 | nenhum arquivo de segredo versionado no git: `secrets/`, `.env`, `.token` | erro |
 | todo script chamado por hook em `.claude/settings*.json` existe | erro |

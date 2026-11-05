@@ -6,8 +6,12 @@ em `STANDARD.md` e um script que cria, liga e checa workspaces. Só biblioteca p
 ## Criar
 
 ```
-python3 workspace.py new <vault>/projects/.agent/projects/<nome>
+python3 workspace.py new <vault>/projects/.agent/projects/<nome> [--repo <url do git>]
 ```
+
+O código mora em `repo/`, com git próprio: o `--repo` clona, e sem ele `repo/` nasce com `git init`.
+O agente abre a sessão na raiz do workspace e constrói dentro de `repo/`, com o código organizado
+por funcionalidade e nomes em inglês (ver `STANDARD.md`, seções Código e Idioma).
 
 Saída real, num workspace de teste:
 
@@ -23,13 +27,15 @@ ws-teste/
 ├── CLAUDE.md                                   @AGENTS.md e @current-state.md
 ├── current-state.md
 ├── session-log.md
-├── decisions/2026-09-14-adotar-workspace-standard.md
+├── ARCHITECTURE.md                             forças e forma, lido pela skill arquitetura
+├── decisions/2026-09-14-adopt-workspace-standard.md
 ├── specs/arquivo/
 ├── memory/MEMORY.md
 ├── secrets/README.md
 ├── .agents/skills/
 ├── .claude/skills                              junction para .agents/skills (local)
 ├── .claude/settings.local.json                 autoMemoryDirectory e hook do check (local)
+├── repo/                                       o código, com git próprio
 ├── .gitignore
 └── .git/
 ```

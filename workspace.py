@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -21,6 +22,10 @@ EXTENSOES_TEXTO = {".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".js", ".cj
                    ".ts", ".py", ".ps1", ".sh", ".php"}
 PASTAS_FORA_DA_VARREDURA = {".git", "node_modules", "secrets", "repo", "__pycache__", ".venv", "venv",
                             "site-packages"}
+PASTAS_PROIBIDAS = {"utils", "helpers", "misc", "common", "lib", "core", "server", "domain",
+                    "comum", "servidor", "dominio"}
+PASTA_COMPARTILHADA = "shared"
+MARCA_ORGANIZACAO = re.compile(r"^Organização:\s*por funcionalidade", re.MULTILINE)
 TOKEN = re.compile(
     r"\bglpat-[\w-]{20}|\bgh[pousr]_[A-Za-z0-9]{36}|\bgithub_pat_\w{60,}|\bsk-(?:ant-|proj-)?[\w-]{32,}"
     r"|\bAKIA[0-9A-Z]{16}|\bxox[baprs]-[\w-]{10,}|\b\d{8,10}:AA[\w-]{33}\b"
@@ -94,6 +99,26 @@ def resolver(caminho, ws):
     return Path(ws, caminho)
 
 
+def organizacao(repo):
+    """Erros da organização por funcionalidade: pasta genérica, nome com acento, funcionalidade sem model."""
+    erros = []
+    for raiz, pastas, arquivos in os.walk(repo):
+        pastas[:] = sorted(p for p in pastas if p not in PASTAS_FORA_DA_VARREDURA and not p.startswith("."))
+        for nome in pastas + sorted(arquivos):
+            rel = "repo/" + Path(raiz, nome).relative_to(repo).as_posix()
+            if not nome.isascii():
+                erros.append(f"{unicodedata.normalize('NFC', rel)}: nome com acento; nomes em inglês")
+            if nome in pastas and nome.lower() in PASTAS_PROIBIDAS:
+                erros.append(f"{rel}: pasta genérica; use o nome da funcionalidade ou {PASTA_COMPARTILHADA}/")
+    # Next.js tem rotas em app/; com features/, só ela guarda funcionalidades.
+    raizes = [repo / "features"] if (repo / "features").is_dir() else [repo / n for n in ("app", "src", "internal")]
+    for raiz in (r for r in raizes if r.is_dir()):
+        for pasta in sorted(p for p in raiz.iterdir() if p.is_dir() and not p.name.startswith((".", "_"))):
+            if pasta.name != PASTA_COMPARTILHADA and not any(f.stem == "model" for f in pasta.iterdir() if f.is_file()):
+                erros.append(f"repo/{pasta.relative_to(repo).as_posix()}: funcionalidade sem model")
+    return erros
+
+
 def check(ws):
     ws = Path(ws)
     achados = []
@@ -124,6 +149,18 @@ def check(ws):
     for alvo in exigidos:
         if not any(cobre(padrao, alvo) for padrao in gitignore):
             erro(f".gitignore não cobre {alvo}")
+
+    repo = ws / "repo"
+    if repo.is_symlink():
+        erro("repo/ é atalho: o código mora em repo/ de verdade")
+    elif repo.is_dir() and not (repo / ".git").exists():
+        erro("repo/ sem .git: o código não tem histórico próprio")
+    elif not repo.exists():
+        aviso("sem repo/: o código mora fora do workspace")
+    agents = ws / "AGENTS.md"
+    if repo.is_dir() and not repo.is_symlink() and agents.is_file() and MARCA_ORGANIZACAO.search(ler(agents)):
+        for msg in organizacao(repo):
+            erro(msg)
 
     versionados = arquivos_versionados(ws)
     for arquivo, conteudo in arquivos_de_texto(ws):
@@ -207,7 +244,7 @@ def link(ws):
     config.write_text(json.dumps(dados, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def new(destino):
+def new(destino, repo=None):
     destino = Path(destino).resolve()
     if destino.exists() and any(destino.iterdir()):
         sys.exit(f"{destino} já existe e não está vazio; new não sobrescreve.")
@@ -226,6 +263,11 @@ def new(destino):
             alvo.parent.mkdir(parents=True, exist_ok=True)
             alvo.write_text(preencher(ler(origem)), encoding="utf-8")
     subprocess.run(["git", "init", "--quiet", str(destino)], check=True)
+    codigo = destino / "repo"
+    if repo:
+        subprocess.run(["git", "clone", "--quiet", repo, str(codigo)], check=True)
+    else:
+        subprocess.run(["git", "init", "--quiet", str(codigo)], check=True)
     link(destino)
     print(f"{destino.name}: criado em {destino.as_posix()}. Preencha o AGENTS.md e rode check.")
 
@@ -259,7 +301,9 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     comandos = parser.add_subparsers(dest="comando", required=True)
-    comandos.add_parser("new", help="cria um workspace a partir de template/").add_argument("destino")
+    novo = comandos.add_parser("new", help="cria um workspace a partir de template/, com o código em repo/")
+    novo.add_argument("destino")
+    novo.add_argument("--repo", help="URL ou caminho do git a clonar em repo/; sem ele, repo/ nasce com git init")
     comandos.add_parser("link", help="refaz a fiação local da máquina").add_argument("workspace")
     checar = comandos.add_parser("check", help="mede um ou mais workspaces; aceita glob")
     checar.add_argument("workspaces", nargs="+")
@@ -267,7 +311,7 @@ def main():
     args = parser.parse_args()
 
     if args.comando == "new":
-        new(args.destino)
+        new(args.destino, args.repo)
     elif args.comando == "link":
         link(args.workspace)
         print(f"{Path(args.workspace).resolve().name}: fiação local refeita.")

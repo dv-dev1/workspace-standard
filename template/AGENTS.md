@@ -25,6 +25,14 @@
 
 Não é fonte: conversa sem registro aqui, export antigo, URL temporária.
 
+## Código
+
+Organização: por funcionalidade. O código mora em `repo/` (git próprio, `git -C repo`).
+
+- Uma pasta por funcionalidade com o nome do negócio, dentro dela `model`, `routes` ou `handler` e `view` só com tela; o comum fica em `shared/`. Mapa por stack no `STANDARD.md`.
+- Pastas, arquivos, identificadores e comentários de código em inglês; texto ao usuário final pode ficar em pt-BR.
+- Forças e forma em `ARCHITECTURE.md`; cada decisão em `decisions/`.
+
 ## Limites
 
 <!-- Uma linha por regra, com a data e o incidente que a criaram; regra sem incidente não entra.

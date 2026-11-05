@@ -3,6 +3,8 @@
 import contextlib
 import io
 import json
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -39,6 +41,73 @@ class WorkspaceTest(unittest.TestCase):
 
     def test_workspace_novo_nasce_conforme(self):
         self.assertEqual(workspace.check(self.ws), [])
+
+    def test_new_cria_repo_com_git(self):
+        self.assertTrue((self.ws / "repo" / ".git").exists())
+
+    def test_new_clona_repo(self):
+        origem = Path(self.tmp.name) / "origem"
+        origem.mkdir()
+
+        def git(*args):
+            subprocess.run(["git", "-C", str(origem), *args], check=True, capture_output=True)
+
+        git("init", "-q")
+        (origem / "a.txt").write_text("a", encoding="utf-8")
+        git("add", "a.txt")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "um")
+        destino = Path(self.tmp.name) / "ws-clone"
+        with contextlib.redirect_stdout(io.StringIO()):
+            workspace.new(destino, repo=str(origem))
+        log = subprocess.run(["git", "-C", str(destino / "repo"), "log", "--oneline"],
+                             capture_output=True, text=True).stdout
+        self.assertEqual(len(log.splitlines()), 1)
+
+    def test_repo_atalho_e_erro(self):
+        outra = Path(self.tmp.name) / "outra"
+        outra.mkdir()
+        shutil.rmtree(self.ws / "repo")
+        (self.ws / "repo").symlink_to(outra, target_is_directory=True)
+        self.assertIn("repo/ é atalho: o código mora em repo/ de verdade", self.achados("ERRO"))
+
+    def test_repo_sem_git_e_erro(self):
+        shutil.rmtree(self.ws / "repo" / ".git")
+        self.assertIn("repo/ sem .git: o código não tem histórico próprio", self.achados("ERRO"))
+
+    def test_sem_repo_e_aviso(self):
+        shutil.rmtree(self.ws / "repo")
+        self.assertIn("sem repo/: o código mora fora do workspace", self.achados("AVISO"))
+        self.assertEqual(self.achados("ERRO"), [])
+
+    def test_pasta_proibida(self):
+        self.escrever("repo/app/utils/x.py", "")
+        self.assertIn("repo/app/utils: pasta genérica; use o nome da funcionalidade ou shared/", self.achados("ERRO"))
+
+    def test_nome_com_acento(self):
+        self.escrever("repo/app/lembrança/model.py", "")
+        self.assertIn("repo/app/lembrança: nome com acento; nomes em inglês", self.achados("ERRO"))
+
+    def test_funcionalidade_sem_model(self):
+        self.escrever("repo/app/reminders/routes.py", "")
+        self.assertIn("repo/app/reminders: funcionalidade sem model", self.achados("ERRO"))
+        self.escrever("repo/app/reminders/model.py", "")
+        self.assertEqual(self.achados("ERRO"), [])
+
+    def test_next_so_features_conta(self):
+        self.escrever("repo/features/schedule/model.ts", "")
+        self.escrever("repo/app/schedule/page.tsx", "")
+        self.assertEqual(self.achados("ERRO"), [])
+
+    def test_shared_nao_precisa_de_model(self):
+        self.escrever("repo/src/shared/db.ts", "")
+        self.assertEqual(self.achados("ERRO"), [])
+
+    def test_sem_marca_nao_cobra_organizacao(self):
+        agents = self.ws / "AGENTS.md"
+        texto = re.sub(r"^Organização:.*$", "", agents.read_text(encoding="utf-8"), flags=re.M)
+        agents.write_text(texto, encoding="utf-8")
+        self.escrever("repo/src/utils/x.js", "")
+        self.assertEqual(self.achados("ERRO"), [])
 
     def test_arquivo_obrigatorio_ausente(self):
         (self.ws / "session-log.md").unlink()

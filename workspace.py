@@ -249,14 +249,31 @@ def link(ws):
     config.write_text(json.dumps(dados, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def new(destino, repo=None):
+def new(destino, repo=None, mover=None):
     destino = Path(destino).resolve()
     if destino.exists() and any(destino.iterdir()):
         sys.exit(f"{destino} já existe e não está vazio; new não sobrescreve.")
+    # Tudo do --move é validado antes de qualquer escrita: a origem é o código de alguém.
+    if mover:
+        if repo:
+            sys.exit("--repo e --move não vêm juntos: o código vem de um clone ou de uma pasta.")
+        if Path(mover).is_symlink():
+            sys.exit(f"{mover} é atalho; passe a pasta de verdade.")
+        origem = Path(mover).resolve()
+        if not origem.is_dir():
+            sys.exit(f"{origem} não existe ou não é pasta.")
+        if destino == origem or destino.is_relative_to(origem):
+            sys.exit(f"{destino} fica dentro de {origem}; a pasta não pode ir para dentro dela mesma.")
     existia = destino.exists()
     codigo = destino / "repo"
     # O código vem antes do template: se o clone falha, não sobra workspace pela metade.
-    if repo:
+    if mover:
+        destino.mkdir(parents=True, exist_ok=True)
+        # shutil.move leva .git, arquivos sem commit e .env; entre discos, copia e apaga a origem.
+        shutil.move(str(origem), str(codigo))
+        if not (codigo / ".git").exists():
+            subprocess.run(["git", "init", "--quiet", str(codigo)], check=True)
+    elif repo:
         try:
             subprocess.run(["git", "clone", "--quiet", repo, str(codigo)], check=True)
         except subprocess.CalledProcessError:
@@ -268,7 +285,7 @@ def new(destino, repo=None):
         subprocess.run(["git", "init", "--quiet", str(codigo)], check=True)
     trocas = {"{{nome}}": destino.name, "{{data}}": date.today().isoformat()}
     # Código que já existe não é reorganizado (STANDARD.md, Código): nasce sem a marca.
-    if repo:
+    if repo or mover:
         trocas["Organização: por funcionalidade. "] = ""
 
     def preencher(texto):
@@ -319,7 +336,9 @@ def main():
     comandos = parser.add_subparsers(dest="comando", required=True)
     novo = comandos.add_parser("new", help="cria um workspace a partir de template/, com o código em repo/")
     novo.add_argument("destino")
-    novo.add_argument("--repo", help="URL ou caminho do git a clonar em repo/; sem ele, repo/ nasce com git init")
+    fonte = novo.add_mutually_exclusive_group()
+    fonte.add_argument("--repo", help="URL ou caminho do git a clonar em repo/; sem ele, repo/ nasce com git init")
+    fonte.add_argument("--move", help="pasta existente a mover para repo/ (leva .git, arquivos sem commit e .env)")
     comandos.add_parser("link", help="refaz a fiação local da máquina").add_argument("workspace")
     checar = comandos.add_parser("check", help="mede um ou mais workspaces; aceita glob")
     checar.add_argument("workspaces", nargs="+")
@@ -327,7 +346,7 @@ def main():
     args = parser.parse_args()
 
     if args.comando == "new":
-        new(args.destino, args.repo)
+        new(args.destino, args.repo, args.move)
     elif args.comando == "link":
         link(args.workspace)
         print(f"{Path(args.workspace).resolve().name}: fiação local refeita.")

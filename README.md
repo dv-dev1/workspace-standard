@@ -6,10 +6,12 @@ em `STANDARD.md` e um script que cria, liga e checa workspaces. Só biblioteca p
 ## Criar
 
 ```
-python3 workspace.py new <vault>/projects/.agent/projects/<nome> [--repo <url do git>]
+python3 workspace.py new <vault>/projects/.agent/projects/<nome> [--repo <url do git> | --move <pasta>]
 ```
 
-O código mora em `repo/`, com git próprio: o `--repo` clona, e sem ele `repo/` nasce com `git init`.
+O código mora em `repo/`, com git próprio: o `--repo` clona, o `--move` leva uma pasta existente (com `.git`,
+arquivos sem commit e `.env`), e sem os dois `repo/` nasce com `git init`. A skill `/novo-workspace` do
+`new-claude-setup` faz isso a partir da conversa, só quando invocada à mão.
 O agente abre a sessão na raiz do workspace e constrói dentro de `repo/`, com o código organizado
 por funcionalidade e nomes em inglês (ver `STANDARD.md`, seções Código e Idioma).
 

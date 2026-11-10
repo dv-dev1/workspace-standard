@@ -145,6 +145,62 @@ class WorkspaceTest(unittest.TestCase):
                 workspace.new(destino, repo=str(Path(self.tmp.name) / "nao-existe"))
         self.assertFalse(destino.exists() and any(destino.iterdir()))
 
+    def pasta_de_codigo(self, nome, com_git=True):
+        origem = Path(self.tmp.name) / nome
+        origem.mkdir()
+        (origem / "a.txt").write_text("a", encoding="utf-8")
+        if com_git:
+            for args in (["init", "-q"], ["add", "a.txt"],
+                         ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "um"]):
+                subprocess.run(["git", "-C", str(origem), *args], check=True, capture_output=True)
+        return origem
+
+    def test_cli_new_move_leva_a_pasta(self):
+        origem = self.pasta_de_codigo("trabalho final ç")
+        (origem / "novo.txt").write_text("sem commit", encoding="utf-8")
+        (origem / ".env").write_text("CHAVE=x", encoding="utf-8")
+        r = subprocess.run([sys.executable, str(SCRIPT), "new", "ws-move", "--move", origem.name],
+                           cwd=self.tmp.name, capture_output=True, text=True, encoding="utf-8")
+        destino = Path(self.tmp.name) / "ws-move"
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse(origem.exists())
+        for nome in (".git", "a.txt", "novo.txt", ".env"):
+            self.assertTrue((destino / "repo" / nome).exists(), nome)
+        status = subprocess.run(["git", "-C", str(destino / "repo"), "status", "--porcelain"],
+                                capture_output=True, text=True).stdout
+        self.assertIn("?? novo.txt", status)
+        self.assertNotIn("Organização:", (destino / "AGENTS.md").read_text(encoding="utf-8"))
+        self.assertEqual([m for n, m in workspace.check(destino) if n == "ERRO"], [])
+
+    def test_new_move_sem_git_ganha_git_init(self):
+        origem = self.pasta_de_codigo("sem-git", com_git=False)
+        destino = Path(self.tmp.name) / "ws-sem-git"
+        with contextlib.redirect_stdout(io.StringIO()):
+            workspace.new(destino, mover=str(origem))
+        self.assertTrue((destino / "repo" / ".git").exists())
+        self.assertTrue((destino / "repo" / "a.txt").exists())
+        self.assertEqual([m for n, m in workspace.check(destino) if n == "ERRO"], [])
+
+    def test_new_move_recusa_sem_mexer_na_origem(self):
+        origem = self.pasta_de_codigo("origem")
+        atalho = Path(self.tmp.name) / "atalho"
+        atalho.symlink_to(origem, target_is_directory=True)
+        destino = Path(self.tmp.name) / "ws-recusa"
+        casos = {
+            "com --repo": lambda: workspace.new(destino, repo=str(origem), mover=str(origem)),
+            "origem inexistente": lambda: workspace.new(destino, mover=str(Path(self.tmp.name) / "nao-existe")),
+            "destino dentro da origem": lambda: workspace.new(origem / "ws", mover=str(origem)),
+            "origem é atalho": lambda: workspace.new(destino, mover=str(atalho)),
+            "destino não vazio": lambda: workspace.new(self.ws, mover=str(origem)),
+        }
+        for caso, chamar in casos.items():
+            with self.subTest(caso), contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(SystemExit):
+                    chamar()
+                self.assertTrue((origem / "a.txt").exists())
+                self.assertFalse((origem / "ws").exists())
+                self.assertFalse(destino.exists())
+
     def test_arquivo_obrigatorio_ausente(self):
         (self.ws / "session-log.md").unlink()
         self.assertIn("session-log.md ausente", self.achados("ERRO"))

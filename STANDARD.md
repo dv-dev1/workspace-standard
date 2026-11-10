@@ -82,7 +82,8 @@ o que aprendeu para a próxima sessão.
 
 - O código mora em `repo/`, pasta de verdade com git próprio, ignorada pelo git do workspace. Não é
   atalho: o agente abre a sessão na raiz do workspace e constrói dentro de `repo/`; o git do código
-  roda com `git -C repo`. `workspace.py new --repo <url>` clona; sem URL, `repo/` nasce com `git init`.
+  roda com `git -C repo`. `workspace.py new --repo <url>` clona; `--move <pasta>` leva uma pasta existente; sem os dois, `repo/`
+  nasce com `git init`.
 - Projeto novo declara `Organização: por funcionalidade` na seção Código do `AGENTS.md` e segue:
   - uma pasta por funcionalidade, com o nome do negócio: `reminders/`, `payments/`;
   - dentro dela, `model` (dado e regra), `routes` ou `handler` (entrada: recebe, chama o model,
@@ -125,7 +126,7 @@ o que aprendeu para a próxima sessão.
 ## Comandos
 
 ```
-python3 workspace.py new <destino> [--repo <url>]   copia template/, git init, repo/, link
+python3 workspace.py new <destino> [--repo <url> | --move <pasta>]   copia template/, git init, repo/, link
 python3 workspace.py link <workspace>       refaz autoMemoryDirectory, junction de skills e hook
 python3 workspace.py check <workspace>...   mede; aceita glob; exit 1 quando há erro
 ```

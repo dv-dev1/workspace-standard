@@ -3,6 +3,7 @@
 import contextlib
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -11,6 +12,7 @@ import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest import mock
 
 import workspace
 
@@ -200,6 +202,40 @@ class WorkspaceTest(unittest.TestCase):
                 self.assertTrue((origem / "a.txt").exists())
                 self.assertFalse((origem / "ws").exists())
                 self.assertFalse(destino.exists())
+
+    def test_new_move_recusa_destino_dentro_com_outra_caixa(self):
+        origem = self.pasta_de_codigo("Proj")
+        if not (Path(self.tmp.name) / "proj").exists():
+            self.skipTest("sistema de arquivos diferencia maiúsculas")
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
+            workspace.new(Path(self.tmp.name) / "proj" / "ws", mover=str(origem))
+        self.assertEqual(sorted(p.name for p in origem.iterdir()), [".git", "a.txt"])
+
+    def test_new_move_recusa_origem_com_o_workspace_standard(self):
+        origem = self.pasta_de_codigo("standard")
+        shutil.copytree(workspace.TEMPLATE, origem / "template")
+        with mock.patch.object(workspace, "TEMPLATE", origem / "template"), \
+                contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
+            workspace.new(Path(self.tmp.name) / "ws-standard", mover=str(origem))
+        self.assertTrue((origem / "template" / "AGENTS.md").exists())
+
+    def test_new_move_recusa_pasta_dentro_de_outro_git(self):
+        pai = self.pasta_de_codigo("faculdade", com_git=False)
+        (pai / "trabalho").mkdir()
+        (pai / "trabalho" / "b.txt").write_text("b", encoding="utf-8")
+        for args in (["init", "-q"], ["add", "."],
+                     ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "um"]):
+            subprocess.run(["git", "-C", str(pai), *args], check=True, capture_output=True)
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
+            workspace.new(Path(self.tmp.name) / "ws-filho", mover=str(pai / "trabalho"))
+        self.assertTrue((pai / "trabalho" / "b.txt").exists())
+
+    def test_new_expande_til(self):
+        origem = self.pasta_de_codigo("codigo-til")
+        with mock.patch.dict(os.environ, {"HOME": self.tmp.name}), contextlib.redirect_stdout(io.StringIO()):
+            workspace.new("~/ws-til", mover="~/codigo-til")
+        self.assertTrue((Path(self.tmp.name) / "ws-til" / "repo" / "a.txt").exists())
+        self.assertFalse(origem.exists())
 
     def test_arquivo_obrigatorio_ausente(self):
         (self.ws / "session-log.md").unlink()

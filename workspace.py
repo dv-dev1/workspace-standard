@@ -249,21 +249,36 @@ def link(ws):
     config.write_text(json.dumps(dados, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def dentro(caminho, pasta):
+    """caminho é pasta ou fica dentro dela. Compara por inode: o APFS não diferencia maiúsculas."""
+    while not caminho.exists():
+        caminho = caminho.parent
+    return any(os.path.samefile(p, pasta) for p in (caminho, *caminho.parents))
+
+
 def new(destino, repo=None, mover=None):
-    destino = Path(destino).resolve()
+    destino = Path(destino).expanduser().resolve()
     if destino.exists() and any(destino.iterdir()):
         sys.exit(f"{destino} já existe e não está vazio; new não sobrescreve.")
     # Tudo do --move é validado antes de qualquer escrita: a origem é o código de alguém.
     if mover:
         if repo:
             sys.exit("--repo e --move não vêm juntos: o código vem de um clone ou de uma pasta.")
-        if Path(mover).is_symlink():
+        if Path(mover).expanduser().is_symlink():
             sys.exit(f"{mover} é atalho; passe a pasta de verdade.")
-        origem = Path(mover).resolve()
+        origem = Path(mover).expanduser().resolve()
         if not origem.is_dir():
             sys.exit(f"{origem} não existe ou não é pasta.")
-        if destino == origem or destino.is_relative_to(origem):
+        if dentro(destino, origem):
             sys.exit(f"{destino} fica dentro de {origem}; a pasta não pode ir para dentro dela mesma.")
+        if dentro(TEMPLATE, origem):
+            sys.exit(f"{origem} contém o próprio workspace-standard; mover quebraria o script e os hooks.")
+        if not (origem / ".git").exists():
+            topo = subprocess.run(["git", "-C", str(origem), "rev-parse", "--show-toplevel"],
+                                  capture_output=True, text=True)
+            if topo.returncode == 0:
+                sys.exit(f"{origem} faz parte do git de {topo.stdout.strip()}; mover tira os arquivos de lá "
+                         "sem levar o histórico.")
     existia = destino.exists()
     codigo = destino / "repo"
     # O código vem antes do template: se o clone falha, não sobra workspace pela metade.

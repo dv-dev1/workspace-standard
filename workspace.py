@@ -6,6 +6,7 @@ import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import unicodedata
@@ -25,6 +26,8 @@ PASTAS_FORA_DA_VARREDURA = {".git", "node_modules", "secrets", "repo", "__pycach
 PASTAS_PROIBIDAS = {"utils", "helpers", "misc", "common", "lib", "core", "server", "domain",
                     "comum", "servidor", "dominio"}
 PASTA_COMPARTILHADA = "shared"
+# Saída de build e dependência copiada: não é código do projeto, a organização não se aplica.
+PASTAS_GERADAS = {"dist", "build", "vendor"}
 MARCA_ORGANIZACAO = re.compile(r"^Organização:\s*por funcionalidade", re.MULTILINE)
 TOKEN = re.compile(
     r"\bglpat-[\w-]{20}|\bgh[pousr]_[A-Za-z0-9]{36}|\bgithub_pat_\w{60,}|\bsk-(?:ant-|proj-)?[\w-]{32,}"
@@ -103,15 +106,17 @@ def organizacao(repo):
     """Erros da organização por funcionalidade: pasta genérica, nome com acento, funcionalidade sem model."""
     erros = []
     for raiz, pastas, arquivos in os.walk(repo):
-        pastas[:] = sorted(p for p in pastas if p not in PASTAS_FORA_DA_VARREDURA and not p.startswith("."))
+        pastas[:] = sorted(p for p in pastas if p not in PASTAS_FORA_DA_VARREDURA | PASTAS_GERADAS
+                           and not p.startswith("."))
         for nome in pastas + sorted(arquivos):
             rel = "repo/" + Path(raiz, nome).relative_to(repo).as_posix()
             if not nome.isascii():
                 erros.append(f"{unicodedata.normalize('NFC', rel)}: nome com acento; nomes em inglês")
             if nome in pastas and nome.lower() in PASTAS_PROIBIDAS:
                 erros.append(f"{rel}: pasta genérica; use o nome da funcionalidade ou {PASTA_COMPARTILHADA}/")
-    # Next.js tem rotas em app/; com features/, só ela guarda funcionalidades.
-    raizes = [repo / "features"] if (repo / "features").is_dir() else [repo / n for n in ("app", "src", "internal")]
+    # Next.js tem rotas em app/; com features/ (na raiz ou em src/), só ela guarda funcionalidades.
+    features = next((r for r in (repo / "features", repo / "src" / "features") if r.is_dir()), None)
+    raizes = [features] if features else [repo / n for n in ("app", "src", "internal")]
     for raiz in (r for r in raizes if r.is_dir()):
         for pasta in sorted(p for p in raiz.iterdir() if p.is_dir() and not p.name.startswith((".", "_"))):
             if pasta.name != PASTA_COMPARTILHADA and not any(f.stem == "model" for f in pasta.iterdir() if f.is_file()):
@@ -248,7 +253,23 @@ def new(destino, repo=None):
     destino = Path(destino).resolve()
     if destino.exists() and any(destino.iterdir()):
         sys.exit(f"{destino} já existe e não está vazio; new não sobrescreve.")
+    existia = destino.exists()
+    codigo = destino / "repo"
+    # O código vem antes do template: se o clone falha, não sobra workspace pela metade.
+    if repo:
+        try:
+            subprocess.run(["git", "clone", "--quiet", repo, str(codigo)], check=True)
+        except subprocess.CalledProcessError:
+            shutil.rmtree(codigo, ignore_errors=True)
+            if not existia:
+                shutil.rmtree(destino, ignore_errors=True)
+            sys.exit(f"git clone de {repo} falhou; nada foi criado em {destino}.")
+    else:
+        subprocess.run(["git", "init", "--quiet", str(codigo)], check=True)
     trocas = {"{{nome}}": destino.name, "{{data}}": date.today().isoformat()}
+    # Código que já existe não é reorganizado (STANDARD.md, Código): nasce sem a marca.
+    if repo:
+        trocas["Organização: por funcionalidade. "] = ""
 
     def preencher(texto):
         for marca, valor in trocas.items():
@@ -263,11 +284,6 @@ def new(destino, repo=None):
             alvo.parent.mkdir(parents=True, exist_ok=True)
             alvo.write_text(preencher(ler(origem)), encoding="utf-8")
     subprocess.run(["git", "init", "--quiet", str(destino)], check=True)
-    codigo = destino / "repo"
-    if repo:
-        subprocess.run(["git", "clone", "--quiet", repo, str(codigo)], check=True)
-    else:
-        subprocess.run(["git", "init", "--quiet", str(codigo)], check=True)
     link(destino)
     print(f"{destino.name}: criado em {destino.as_posix()}. Preencha o AGENTS.md e rode check.")
 

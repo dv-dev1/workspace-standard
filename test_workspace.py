@@ -109,6 +109,42 @@ class WorkspaceTest(unittest.TestCase):
         self.escrever("repo/src/utils/x.js", "")
         self.assertEqual(self.achados("ERRO"), [])
 
+    def test_build_e_vendor_ignorados(self):
+        self.escrever("repo/.gitignore", "dist/\nbuild/\n")
+        self.escrever("repo/dist/server/x.js", "")
+        self.escrever("repo/build/lib/x.py", "")
+        self.escrever("repo/vendor/github.com/x/lib/a.go", "")
+        self.assertEqual(self.achados("ERRO"), [])
+
+    def test_next_com_src_features(self):
+        self.escrever("repo/src/features/schedule/model.ts", "")
+        self.escrever("repo/src/app/schedule/page.tsx", "")
+        self.assertEqual(self.achados("ERRO"), [])
+
+    def test_new_com_repo_existente_nasce_sem_marca(self):
+        origem = Path(self.tmp.name) / "existente"
+        (origem / "web" / "lib").mkdir(parents=True)
+        (origem / "web" / "lib" / "a.ts").write_text("", encoding="utf-8")
+
+        def git(*args):
+            subprocess.run(["git", "-C", str(origem), *args], check=True, capture_output=True)
+
+        git("init", "-q")
+        git("add", ".")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "um")
+        destino = Path(self.tmp.name) / "ws-existente"
+        with contextlib.redirect_stdout(io.StringIO()):
+            workspace.new(destino, repo=str(origem))
+        self.assertNotIn("Organização:", (destino / "AGENTS.md").read_text(encoding="utf-8"))
+        self.assertEqual([m for n, m in workspace.check(destino) if n == "ERRO"], [])
+
+    def test_clone_que_falha_nao_deixa_lixo(self):
+        destino = Path(self.tmp.name) / "ws-falho"
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                workspace.new(destino, repo=str(Path(self.tmp.name) / "nao-existe"))
+        self.assertFalse(destino.exists() and any(destino.iterdir()))
+
     def test_arquivo_obrigatorio_ausente(self):
         (self.ws / "session-log.md").unlink()
         self.assertIn("session-log.md ausente", self.achados("ERRO"))
